@@ -1,8 +1,10 @@
 import os
+from threading import Thread
 
 import discord
 from discord import app_commands
 from dotenv import load_dotenv
+from flask import Flask
 
 from tracking import get_tracking_info
 
@@ -15,6 +17,27 @@ load_dotenv()
 
 TOKEN = os.getenv("DISCORD_TOKEN")
 GUILD_ID = os.getenv("GUILD_ID")
+
+
+# -----------------------------------------
+# WEB SERVER FOR RENDER
+# -----------------------------------------
+
+app = Flask(__name__)
+
+
+@app.route("/")
+def home():
+    return "Package Tracker Bot is running!"
+
+
+def run_web_server():
+    port = int(os.environ.get("PORT", 10000))
+
+    app.run(
+        host="0.0.0.0",
+        port=port
+    )
 
 
 # -----------------------------------------
@@ -81,7 +104,7 @@ async def track(
     # Tell Discord that the bot is processing
     await interaction.response.defer()
 
-    # Clean tracking number
+    # Remove accidental spaces
     tracking_number = tracking_number.strip()
 
     print(
@@ -186,10 +209,10 @@ async def track(
 
         history = ""
 
-        # Get the latest 5 tracking events
+        # Get the latest 5 events
         latest_events = events[-5:]
 
-        # Show newest first
+        # Display newest first
         for event in reversed(latest_events):
 
             event_status = event.get(
@@ -205,18 +228,18 @@ async def track(
                 "occurrenceDatetime"
             )
 
-            # Add status
+            # Status
             history += (
                 f"**{event_status}**\n"
             )
 
-            # Add location if available
+            # Location
             if event_location:
                 history += (
                     f"📍 {event_location}\n"
                 )
 
-            # Add date if available
+            # Date
             if event_date:
                 history += (
                     f"🕐 {event_date}\n"
@@ -224,7 +247,7 @@ async def track(
 
             history += "\n"
 
-        # Discord field limit is 1024 characters
+        # Discord fields have a 1024-character limit
         history = history[:1024]
 
         embed.add_field(
@@ -257,19 +280,29 @@ async def track(
 if not TOKEN:
 
     raise ValueError(
-        "DISCORD_TOKEN is missing from .env"
+        "DISCORD_TOKEN is missing from environment variables."
     )
 
 
 if not GUILD_ID:
 
     raise ValueError(
-        "GUILD_ID is missing from .env"
+        "GUILD_ID is missing from environment variables."
     )
 
 
 # -----------------------------------------
-# START BOT
+# START WEB SERVER
+# -----------------------------------------
+
+Thread(
+    target=run_web_server,
+    daemon=True
+).start()
+
+
+# -----------------------------------------
+# START DISCORD BOT
 # -----------------------------------------
 
 bot.run(TOKEN)
